@@ -67,7 +67,7 @@ ChromeTraceBaseTime& ChromeTraceBaseTime::singleton() {
 // while a double can only represent 15-16 digits. By using relative time,
 // other applications can accurately read the 'ts' field as a double.
 // Use the program loading time as the baseline time.
-inline int64_t transToRelativeTime(int64_t time) {
+int64_t transToRelativeTime(int64_t time) {
   // Sometimes after converting to relative time, it can be a few nanoseconds
   // negative. Since Chrome trace and json processing will throw a parser error,
   // guard this.
@@ -468,19 +468,18 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
       if (!arg_values.empty()) {
         arg_values.append(",");
       }
-      arg_values.append(
-          fmt::format(
-              R"( "{}": {}, "{}": {}, "{}": {}, "{}": {}, "{}": {})",
-              kCollectiveName,
-              collectiveName,
-              kInMsgNelems,
-              inMsgSize,
-              kOutMsgNelems,
-              outMsgSize,
-              kGroupSize,
-              groupSize,
-              kDtype,
-              dtype));
+      arg_values.append(fmt::format(
+          R"( "{}": {}, "{}": {}, "{}": {}, "{}": {}, "{}": {})",
+          kCollectiveName,
+          collectiveName,
+          kInMsgNelems,
+          inMsgSize,
+          kOutMsgNelems,
+          outMsgSize,
+          kGroupSize,
+          groupSize,
+          kDtype,
+          dtype));
     }
     const auto& input_tensor_starts =
         collectiveRecord->getMetadataValue(std::string(kInTensorsStart));
@@ -509,13 +508,12 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
       if (!arg_values.empty()) {
         arg_values.append(",");
       }
-      arg_values.append(
-          fmt::format(
-              R"( "{}": {}, "{}": {})",
-              kInSplit,
-              inSplitSize,
-              kOutSplit,
-              outSplitSize));
+      arg_values.append(fmt::format(
+          R"( "{}": {}, "{}": {})",
+          kInSplit,
+          inSplitSize,
+          kOutSplit,
+          outSplitSize));
     }
     const auto& processGroupName =
         collectiveRecord->getMetadataValue(std::string(kProcessGroupName));
