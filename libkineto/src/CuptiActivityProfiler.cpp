@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifdef HAS_CUPTI
-
 #include "CuptiActivityProfiler.h"
 #include <cupti.h>
 #include <fmt/format.h>
@@ -17,7 +15,6 @@
 
 #include "ActivityBuffers.h"
 #include "Config.h"
-#include "CuptiActivity.cpp"
 #include "CuptiActivity.h"
 #include "CuptiActivityApi.h"
 #include "Demangle.h"
@@ -271,7 +268,7 @@ void CuptiActivityProfiler::handleDriverActivity(
     const CUpti_ActivityAPI* activity,
     ActivityLogger* logger) {
   // we only want to collect cuLaunchKernel events, for triton kernel launches
-  if (!isKernelLaunchApi(*activity)) {
+  if (!isTrackedDriverCbid(*activity)) {
     // XXX should we count other driver events?
     return;
   }
@@ -480,7 +477,7 @@ void CuptiActivityProfiler::handleCuptiActivity(
           reinterpret_cast<const CUpti_ActivityAPI*>(record), logger);
       break;
     case CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL: {
-      auto kernel = reinterpret_cast<const CUpti_ActivityKernel4*>(record);
+      auto kernel = reinterpret_cast<const CUpti_ActivityKernelType*>(record);
       // Register all kernels launches so we could correlate them with other
       // events.
       KernelRegistry::singleton()->recordKernel(
@@ -526,5 +523,3 @@ void CuptiActivityProfiler::handleCuptiActivity(
 }
 
 } // namespace KINETO_NAMESPACE
-
-#endif // HAS_CUPTI

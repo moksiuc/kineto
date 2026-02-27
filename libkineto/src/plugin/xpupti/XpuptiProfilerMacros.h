@@ -24,8 +24,10 @@ using namespace libkineto;
     std::string_view errMsg,
     pti_result errCode);
 
-[[noreturn]] void
-throwXpuRuntimeError(const char* func, int line, pti_result errCode);
+[[noreturn]] void throwXpuRuntimeError(
+    const char* func,
+    int line,
+    pti_result errCode);
 
 #define XPUPTI_CALL(returnCode)                             \
   {                                                         \

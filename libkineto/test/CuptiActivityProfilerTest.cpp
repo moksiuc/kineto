@@ -8,9 +8,9 @@
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
-#include <folly/json/json.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers) required for setenv unsetenv
 
 #include <strings.h>
@@ -61,6 +61,12 @@ static constexpr int32_t kTruncatLength = 30;
 
 #define CU_LAUNCH_KERNEL CUPTI_DRIVER_TRACE_CBID_cuLaunchKernel
 #define CU_LAUNCH_KERNEL_EX CUPTI_DRIVER_TRACE_CBID_cuLaunchKernelEx
+#define CU_MEM_CREATE CUPTI_DRIVER_TRACE_CBID_cuMemCreate
+#define CU_MEM_MAP CUPTI_DRIVER_TRACE_CBID_cuMemMap
+#define CU_MEM_UNMAP CUPTI_DRIVER_TRACE_CBID_cuMemUnmap
+#define CU_MEM_RELEASE CUPTI_DRIVER_TRACE_CBID_cuMemRelease
+#define CU_MEM_EXPORT CUPTI_DRIVER_TRACE_CBID_cuMemExportToShareableHandle
+#define CU_MEM_IMPORT CUPTI_DRIVER_TRACE_CBID_cuMemImportFromShareableHandle
 
 namespace {
 const TraceSpan& defaultTraceSpan() {
@@ -139,10 +145,12 @@ struct MockCuptiActivityBuffer {
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
-  void
-  addKernelActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addKernelActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     auto& act =
-        createActivity<CUpti_ActivityKernel4>(start_ns, end_ns, correlation);
+        createActivity<CUpti_ActivityKernelType>(start_ns, end_ns, correlation);
     act.kind = CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL;
     act.deviceId = 0;
     act.contextId = 0;
@@ -153,8 +161,10 @@ struct MockCuptiActivityBuffer {
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
-  void
-  addMemcpyActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addMemcpyActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     auto& act =
         createActivity<CUpti_ActivityMemcpy>(start_ns, end_ns, correlation);
     act.kind = CUPTI_ACTIVITY_KIND_MEMCPY;
@@ -181,10 +191,12 @@ struct MockCuptiActivityBuffer {
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
-  void
-  addCollectiveActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addCollectiveActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     auto& act =
-        createActivity<CUpti_ActivityKernel4>(start_ns, end_ns, correlation);
+        createActivity<CUpti_ActivityKernelType>(start_ns, end_ns, correlation);
     act.name = "collective_gpu";
     act.kind = CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL;
     act.queued = 0;
@@ -506,10 +518,22 @@ TEST_F(CuptiActivityProfilerTest, SyncTrace) {
       CU_LAUNCH_KERNEL, start_time_ns + 165, start_time_ns + 175, 4);
   gpuOps->addDriverActivity(
       CU_LAUNCH_KERNEL_EX, start_time_ns + 195, start_time_ns + 205, 5);
+  gpuOps->addDriverActivity(
+      CU_MEM_CREATE, start_time_ns + 220, start_time_ns + 230, 6);
+  gpuOps->addDriverActivity(
+      CU_MEM_MAP, start_time_ns + 235, start_time_ns + 245, 7);
+  gpuOps->addDriverActivity(
+      CU_MEM_UNMAP, start_time_ns + 250, start_time_ns + 260, 8);
+  gpuOps->addDriverActivity(
+      CU_MEM_RELEASE, start_time_ns + 265, start_time_ns + 275, 9);
+  gpuOps->addDriverActivity(
+      CU_MEM_EXPORT, start_time_ns + 278, start_time_ns + 285, 10);
+  gpuOps->addDriverActivity(
+      CU_MEM_IMPORT, start_time_ns + 287, start_time_ns + 293, 11);
   gpuOps->addRuntimeActivity(
-      CUDA_STREAM_SYNC, start_time_ns + 146, start_time_ns + 240, 6);
+      CUDA_STREAM_SYNC, start_time_ns + 146, start_time_ns + 240, 12);
   gpuOps->addRuntimeActivity(
-      CUDA_EVENT_SYNC, start_time_ns + 241, start_time_ns + 250, 7);
+      CUDA_EVENT_SYNC, start_time_ns + 241, start_time_ns + 250, 13);
   gpuOps->addKernelActivity(start_time_ns + 50, start_time_ns + 70, 1);
   gpuOps->addMemcpyActivity(start_time_ns + 140, start_time_ns + 150, 2);
   gpuOps->addKernelActivity(start_time_ns + 160, start_time_ns + 220, 3);
@@ -518,13 +542,13 @@ TEST_F(CuptiActivityProfilerTest, SyncTrace) {
   gpuOps->addSyncActivity(
       start_time_ns + 221,
       start_time_ns + 223,
-      6,
+      12,
       CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_STREAM_SYNCHRONIZE);
   // Add wait event on kernel stream 1
   gpuOps->addSyncActivity(
       start_time_ns + 224,
       start_time_ns + 226,
-      7,
+      13,
       CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_STREAM_WAIT_EVENT,
       1 /*stream*/);
   // This event should be ignored because it is not on a stream that has no GPU
@@ -532,14 +556,14 @@ TEST_F(CuptiActivityProfilerTest, SyncTrace) {
   gpuOps->addSyncActivity(
       start_time_ns + 226,
       start_time_ns + 230,
-      8,
+      14,
       CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_STREAM_WAIT_EVENT,
       4 /*stream*/);
   // Comes from CudaEventSynchronize call on CPU
   gpuOps->addSyncActivity(
       start_time_ns + 227,
       start_time_ns + 226,
-      7,
+      13,
       CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_EVENT_SYNCHRONIZE,
       -1 /*stream*/);
   cuptiActivities_.activityBuffer = std::move(gpuOps);
@@ -553,7 +577,7 @@ TEST_F(CuptiActivityProfilerTest, SyncTrace) {
 
   // Wrapper that allows iterating over the activities
   ActivityTrace trace(std::move(logger), loggerFactory);
-  EXPECT_EQ(trace.activities()->size(), 20);
+  EXPECT_EQ(trace.activities()->size(), 26);
   std::map<std::string, int> activityCounts;
   std::map<int64_t, int> resourceIds;
   for (auto& activity : *trace.activities()) {
@@ -570,6 +594,12 @@ TEST_F(CuptiActivityProfilerTest, SyncTrace) {
   EXPECT_EQ(activityCounts["op4"], 1);
   EXPECT_EQ(activityCounts["cudaLaunchKernel"], 2);
   EXPECT_EQ(activityCounts["cuLaunchKernelEx"], 1);
+  EXPECT_EQ(activityCounts["cuMemCreate"], 1);
+  EXPECT_EQ(activityCounts["cuMemMap"], 1);
+  EXPECT_EQ(activityCounts["cuMemUnmap"], 1);
+  EXPECT_EQ(activityCounts["cuMemRelease"], 1);
+  EXPECT_EQ(activityCounts["cuMemExportToShareableHandle"], 1);
+  EXPECT_EQ(activityCounts["cuMemImportFromShareableHandle"], 1);
   EXPECT_EQ(activityCounts["cudaMemcpy"], 1);
   EXPECT_EQ(activityCounts["cudaStreamSynchronize"], 1);
   EXPECT_EQ(activityCounts["cudaEventSynchronize"], 1);
@@ -581,7 +611,7 @@ TEST_F(CuptiActivityProfilerTest, SyncTrace) {
   auto sysTid = systemThreadId();
   // Ops and runtime events are on thread sysTid along with the flow start
   // events
-  EXPECT_EQ(resourceIds[sysTid], 12);
+  EXPECT_EQ(resourceIds[sysTid], 18);
   // Kernels and sync events are on stream 1, memcpy on stream 2
   EXPECT_EQ(resourceIds[1], 6);
   EXPECT_EQ(resourceIds[2], 1);
@@ -741,11 +771,11 @@ TEST_F(CuptiActivityProfilerTest, GpuNCCLCollectiveTest) {
   }
   std::string jsonStr(
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  folly::dynamic jsonData = folly::parseJson(jsonStr);
+  nlohmann::json jsonData = nlohmann::json::parse(jsonStr);
 
-  // Convert the folly::dynamic object to a string and check
+  // Convert the JSON object to a string and check
   // if the substring exists
-  std::string jsonString = folly::toJson(jsonData);
+  std::string jsonString = jsonData.dump();
   auto countSubstrings = [](const std::string& source,
                             const std::string& substring) {
     size_t count = 0;
@@ -1028,7 +1058,7 @@ TEST(CuptiActivityProfiler, MetadataJsonFormatingTest) {
   }
   std::string jsonStr(
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  folly::dynamic jsonData = folly::parseJson(jsonStr);
+  nlohmann::json jsonData = nlohmann::json::parse(jsonStr);
 
   auto countSubstrings = [](const std::string& source,
                             const std::string& substring) {
@@ -1047,9 +1077,10 @@ TEST(CuptiActivityProfiler, MetadataJsonFormatingTest) {
   EXPECT_EQ(1, countSubstrings(jsonStr, "/test/metadata/path"));
 
   // Verify injected env vars are in trace metadata with correct values
-  EXPECT_EQ(jsonData["PT_PROFILER_JOB_NAME"].asString(), "test_training_job");
-  EXPECT_EQ(jsonData["PT_PROFILER_JOB_VERSION"].asString(), "2");
-  EXPECT_EQ(jsonData["PT_PROFILER_JOB_ATTEMPT_INDEX"].asString(), "5");
+  EXPECT_EQ(
+      jsonData["PT_PROFILER_JOB_NAME"].get<std::string>(), "test_training_job");
+  EXPECT_EQ(jsonData["PT_PROFILER_JOB_VERSION"].get<std::string>(), "2");
+  EXPECT_EQ(jsonData["PT_PROFILER_JOB_ATTEMPT_INDEX"].get<std::string>(), "5");
 #endif
 
   // Clean up environment variables
@@ -1114,18 +1145,20 @@ TEST_F(CuptiActivityProfilerTest, JsonGPUIDSortTest) {
   }
   std::string jsonStr(
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  folly::dynamic jsonData = folly::parseJson(jsonStr);
+  nlohmann::json jsonData = nlohmann::json::parse(jsonStr);
 
   std::unordered_map<int64_t, std::string> sortLabel;
   std::unordered_map<int64_t, int64_t> sortIdx;
   for (auto& event : jsonData["traceEvents"]) {
     if (event["name"] == "process_labels" && event["tid"] == 0 &&
-        event["pid"].isInt()) {
-      sortLabel[event["pid"].asInt()] = event["args"]["labels"].asString();
+        event["pid"].is_number_integer()) {
+      sortLabel[event["pid"].get<int64_t>()] =
+          event["args"]["labels"].get<std::string>();
     }
     if (event["name"] == "process_sort_index" && event["tid"] == 0 &&
-        event["pid"].isInt()) {
-      sortIdx[event["pid"].asInt()] = event["args"]["sort_index"].asInt();
+        event["pid"].is_number_integer()) {
+      sortIdx[event["pid"].get<int64_t>()] =
+          event["args"]["sort_index"].get<int64_t>();
     }
   }
 

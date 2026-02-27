@@ -8,11 +8,9 @@
 
 #pragma once
 
-#include <atomic>
-#ifdef HAS_CUPTI
 #include <cupti.h>
-#endif
 #include <array>
+#include <atomic>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -36,10 +34,7 @@ using namespace libkineto;
  *  in order to speed up the implementation for fast path.
  */
 
-using CuptiCallbackFn = void (*)(
-    CUpti_CallbackDomain domain,
-    CUpti_CallbackId cbid,
-    const CUpti_CallbackData* cbInfo);
+using CuptiCallbackFn = void (*)(CUpti_CallbackDomain domain, CUpti_CallbackId cbid, const CUpti_CallbackData* cbInfo);
 
 class CuptiCallbackApi {
  public:
@@ -74,7 +69,6 @@ class CuptiCallbackApi {
     return initSuccess_;
   }
 
-#ifdef HAS_CUPTI
   CUptiResult getCuptiStatus() const {
     return lastCuptiStatus_;
   }
@@ -82,18 +76,11 @@ class CuptiCallbackApi {
   CUpti_SubscriberHandle getCuptiSubscriber() const {
     return subscriber_;
   }
-#endif
 
-  bool registerCallback(
-      CUpti_CallbackDomain domain,
-      CuptiCallBackID cbid,
-      CuptiCallbackFn cbfn);
+  bool registerCallback(CUpti_CallbackDomain domain, CuptiCallBackID cbid, CuptiCallbackFn cbfn);
 
   // returns false if callback was not found
-  bool deleteCallback(
-      CUpti_CallbackDomain domain,
-      CuptiCallBackID cbid,
-      CuptiCallbackFn cbfn);
+  bool deleteCallback(CUpti_CallbackDomain domain, CuptiCallBackID cbid, CuptiCallbackFn cbfn);
 
   // Cupti Callback may be enable for domain and cbid pairs, or domains alone.
   bool enableCallback(CUpti_CallbackDomain domain, CUpti_CallbackId cbid);
@@ -106,10 +93,7 @@ class CuptiCallbackApi {
 
   // Please do not use this method. This has to be exposed as public
   // so it is accessible from the callback handler
-  void __callback_switchboard(
-      CUpti_CallbackDomain domain,
-      CUpti_CallbackId cbid,
-      const CUpti_CallbackData* cbInfo);
+  void __callback_switchboard(CUpti_CallbackDomain domain, CUpti_CallbackId cbid, const CUpti_CallbackData* cbInfo);
 
  private:
   friend class std::shared_ptr<CuptiCallbackApi>;
@@ -118,11 +102,9 @@ class CuptiCallbackApi {
   using CallbackList = std::list<CuptiCallbackFn>;
 
   // level 2 tables sizes are known at compile time
-  constexpr static size_t RUNTIME_CB_DOMAIN_SIZE =
-      (__RUNTIME_CB_DOMAIN_END - __RUNTIME_CB_DOMAIN_START);
+  constexpr static size_t RUNTIME_CB_DOMAIN_SIZE = (__RUNTIME_CB_DOMAIN_END - __RUNTIME_CB_DOMAIN_START);
 
-  constexpr static size_t RESOURCE_CB_DOMAIN_SIZE =
-      (__RESOURCE_CB_DOMAIN_END - __RESOURCE_CB_DOMAIN_START);
+  constexpr static size_t RESOURCE_CB_DOMAIN_SIZE = (__RESOURCE_CB_DOMAIN_END - __RESOURCE_CB_DOMAIN_START);
 
   // level 1 table is a struct
   struct CallbackTable {
@@ -144,10 +126,8 @@ class CuptiCallbackApi {
   using ReaderLockGuard = std::shared_lock<ReaderWriterLock>;
   using WriteLockGuard = std::unique_lock<ReaderWriterLock>;
   ReaderWriterLock callbackLock_;
-#ifdef HAS_CUPTI
   CUptiResult lastCuptiStatus_;
   CUpti_SubscriberHandle subscriber_{nullptr};
-#endif
 };
 
 } // namespace KINETO_NAMESPACE

@@ -8,10 +8,6 @@
 
 #pragma once
 
-// TODO DEVICE_AGNOSTIC: The build system should be strict enough that we don't
-//                       need this guard in the header file.
-#ifdef HAS_CUPTI
-
 #include <cupti.h>
 #include "CuptiActivity.h"
 #include "CuptiActivityApi.h"
@@ -42,27 +38,14 @@ class CuptiActivityProfiler : public GenericActivityProfiler {
 
  private:
   // Process generic CUPTI activity
-  void handleCuptiActivity(
-      const CUpti_Activity* record,
-      ActivityLogger* logger);
+  void handleCuptiActivity(const CUpti_Activity* record, ActivityLogger* logger);
   // Process specific GPU activity types
-  void handleCorrelationActivity(
-      const CUpti_ActivityExternalCorrelation* correlation);
-  void handleRuntimeActivity(
-      const CUpti_ActivityAPI* activity,
-      ActivityLogger* logger);
-  void handleDriverActivity(
-      const CUpti_ActivityAPI* activity,
-      ActivityLogger* logger);
-  void handleOverheadActivity(
-      const CUpti_ActivityOverhead* activity,
-      ActivityLogger* logger);
-  void handleCudaEventActivity(
-      const CUpti_ActivityCudaEventType* activity,
-      ActivityLogger* logger);
-  void handleCudaSyncActivity(
-      const CUpti_ActivitySynchronization* activity,
-      ActivityLogger* logger);
+  void handleCorrelationActivity(const CUpti_ActivityExternalCorrelation* correlation);
+  void handleRuntimeActivity(const CUpti_ActivityAPI* activity, ActivityLogger* logger);
+  void handleDriverActivity(const CUpti_ActivityAPI* activity, ActivityLogger* logger);
+  void handleOverheadActivity(const CUpti_ActivityOverhead* activity, ActivityLogger* logger);
+  void handleCudaEventActivity(const CUpti_ActivityCudaEventType* activity, ActivityLogger* logger);
+  void handleCudaSyncActivity(const CUpti_ActivitySynchronization* activity, ActivityLogger* logger);
   template <class T>
   void handleGpuActivity(const T* act, ActivityLogger* logger);
   void logDeferredEvents();
@@ -75,5 +58,3 @@ class CuptiActivityProfiler : public GenericActivityProfiler {
 uint32_t contextIdtoDeviceId(uint32_t contextId);
 
 } // namespace KINETO_NAMESPACE
-
-#endif // HAS_CUPTI
